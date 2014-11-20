@@ -10,24 +10,44 @@
 		<title>index</title>
 		
 		<link rel="stylesheet" href="css/animations.css">
+		<link rel="stylesheet" href="css/style.css">
 		
 		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular.min.js"></script>
 		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular-animate.min.js"></script>
+		<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDalLhjvGPN_GEi55m92NibYrPBGCO5r40"></script>
 		
 		<script src="client.js"></script>
 	</head>
 
 	<body ng-controller="Controller">
-		<button ng-click="doGet()">Do GET</button>
+		<button ng-click="doGet()" ng-disabled="accessKey == null">Do GET</button>
 		<button ng-click="doPost()">Do POST</button>
-		<button ng-click="doPut()">Do PUT</button>
-		<button ng-click="doDelete()">Do DELETE</button>
+		<button ng-click="doPut()" ng-disabled="accessKey == null">Do PUT</button>
+		<button ng-click="doDelete()" ng-disabled="accessKey == null">Do DELETE</button>
 		<button ng-click="doDatabase()">Do Database</button>
 		<ul>
 			<li class="phone-listing" ng-repeat="(propertyName, value) in data">
 				{{propertyName}} : {{value}}
 			</li>
 		</ul>
+		<div id="type-selector">
+			<label ng-repeat="type in availableTypes"><input type="checkbox" name="{{type.value}}"  />{{type.name}}</label>
+		</div>
+		<div ng-if="placesList != null">
+			<ul id="places-list">
+				<li class="place-info" ng-repeat="place in placesList" ng-click="putFocusOnMap(place.lat, place.lon)">
+					<span class="place-name">{{place.name}}</span>
+					<span class="place-vicinity">{{place.vicinity}}</span>
+					<span class="place-proximity-score">{{place.proximity_score}}</span>
+				</li>
+				<li class="place-info" ng-if="placesList.length == 0">
+					<span class="place-name">Vietų nerasta</span>
+					<span class="place-vicinity">Pamėginkite pakeisti pasirinktus tipus</span>
+				</li>
+			</ul>
+		</div>
+		<div style="position: fixed; right: 0px; top: 0px;">
+		<div id="map-canvas" ng-hide="map == null" style="height: 300px; width: 400px"></div>
 		</div>
 	</body>
 </html>
