@@ -3,12 +3,61 @@ var plcApp = angular.module('plcApp', ['ngAnimate']);
 plcApp.controller('Controller', function($scope, $http) {
 	'use strict';
 	
+	$scope.path_prefix = '/plc';
+	
 	$scope.placesList = null;
+	
+	$scope.availableTypes = [
+	                         {name : 'Mokykla', value : 'school'}, 
+	                         {name : 'Naktinis klubas', value : 'night_club'},
+	                         {name : 'Atrakcijonų parkas', value : 'amusement_park'},
+	                         {name : 'Baras', value : 'bar'},
+	                         {name : 'Kavinė', value : 'cafe'},
+	                         {name : 'Kazino', value : 'casino'},
+	                         {name : 'Parkas', value : 'park'},
+	                         {name : 'Restoranas', value : 'restaurant'},
+	                         {name : 'Stadionas', value : 'stadium'},
+	                         {name : 'Universitetas', value : 'university'},
+	                         ];
+	
+	$scope.userMarker = null;
+	$scope.focusMarker = null;
+	
 	$scope.accessKey = null;
+	$scope.lat = null;
+	$scope.lon = null;
+	$scope.lastUpdate = 0;
 	
-	$scope.availableTypes = [{name : 'Mokykla', value : 'school'}, {name : 'Naktinis klubas', value : 'night_club'}];
+	$scope.loading = false;
 	
-	$scope.doGet = function() {
+	var cookie = document.cookie;
+	var pattern = /key=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/g;
+	var matches = pattern.exec(cookie);
+	if (matches != null) {
+		$scope.accessKey = matches[1];
+		console.log("key restored: " + matches[1]);
+	}
+	
+	if (typeof(Number.prototype.toRad) === "undefined") {
+		Number.prototype.toRad = function() {
+			return this * Math.PI / 180;
+		}
+	}
+	
+	$scope.distance = function(lat1, lon1, lat2, lon2) {
+			var R = 6371; // Radius of the earth in km
+			var dLat = (lat2-lat1).toRad();  // Javascript functions in radians
+			var dLon = (lon2-lon1).toRad(); 
+			var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+					Math.cos(lat1.toRad()) * Math.cos(lat2.toRad()) * 
+					Math.sin(dLon/2) * Math.sin(dLon/2); 
+			var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+			var d = R * c; // Distance in km
+			return d;
+		}
+	
+	$scope.getPlaces = function() {
+		$scope.loading = true;
 		var types = '';
 		var typeCheckboxes = document.getElementById('type-selector').getElementsByTagName('input');
 		for (var i = 0; i < typeCheckboxes.length; i++) {
@@ -19,60 +68,109 @@ plcApp.controller('Controller', function($scope, $http) {
 		if (types == '') {
 			types = 'establishment';
 		}
-		$http.get('http://localhost:8080/places/' + $scope.accessKey + '?lat=54.905451&lon=23.957689&types=' + types).success(function(data) {
-			//$scope.data.status = data.status;
+		$http.get($scope.path_prefix + '/places/' + $scope.accessKey + '?lat=' + $scope.lat + '&lon=' + $scope.lon + '&types=' + types).success(function(data, status) {
+			$scope.loading = false;
 			$scope.placesList = data.results;
-			var mapOptions = {
-					center: { lat: -34.397, lng: 150.644},
-					zoom: 8
-			};
-			$scope.map = new google.maps.Map(document.getElementById('map-canvas'),
-			            mapOptions);
+		}).error(function(data){
+			alert(data);
+		});
+	};
 
-		}).error(function(data){
-			alert(data);
-		});
-	};
-	
-	$scope.doPost = function() {
-		$http.post('http://localhost:8080/positions/').success(function(data) {
-			$scope.data = data;
-			if (data.status == '201') {
-				$scope.accessKey = data.key;
+	$scope.updatePosition = function(key, lat, lon) {
+		var location = {lat: lat, lon: lon};
+		$http.put($scope.path_prefix + '/positions/' + key, {'location':location}).success(function(data, status) {
+			if (status == 200) {
+				$scope.data = data;
+				$scope.lastUpdate = new Date().getTime();
 			}
-		}).error(function(data){
-			alert(data);
+		}).catch(function(error) {
+			if (error.status == 401) {
+				console.error('key is invalid');
+				$scope.getAccessKey();
+			}
 		});
 	};
 	
-	$scope.doPut = function() {
-		var location = {lat : 54.904193 + (Math.random() - 0.5) / 100, lon : 23.958536 + (Math.random() - 0.5) / 100};
-		$http.put('http://localhost:8080/positions/' + $scope.accessKey, {'location':location}).success(function(data) {
+	$scope.getAccessKey = function() {
+		$http.post($scope.path_prefix + '/positions/').success(function(data, status) {
 			$scope.data = data;
-		}).error(function(data){
-			alert(data);
+			if (status == 201) {
+				$scope.accessKey = data.key;
+				$scope.updatePosition($scope.accessKey, $scope.lat, $scope.lon);
+			}
+		}).catch(function(error){
+			console.error('Nepavyko gauti „access key“');
 		});
 	};
 	
-	$scope.doDelete = function() {
-		$http.delete('http://localhost:8080/positions/' + $scope.accessKey).success(function(data) {
-			$scope.data = data;
-			$scope.accessKey = null;
-		}).error(function(data){
-			alert(data);
+	$scope.onLocationUpdate = function(position) {
+		$scope.$apply(function() {
+			var lat = position.coords.latitude;
+			var lon = position.coords.longitude;
+			if ($scope.map == null) {
+				$scope.initMap(lat, lon);
+			}
+			
+			console.log(position.coords.latitude + " " + position.coords.longitude);
+			
+			if ($scope.lat == null || $scope.lon == null) {
+				$scope.lat = lat;
+				$scope.lon = lon;
+			} else if ($scope.distance(lat, lon, $scope.lat, $scope.lon) > 0.010 
+					|| (new Date().getTime() - $scope.lastUpdate) > 10000) {
+				$scope.lat = lat;
+				$scope.lon = lon;
+				$scope.userMarker.setPosition(new google.maps.LatLng(lat, lon));
+				$scope.updatePosition($scope.accessKey, $scope.lat, $scope.lon);
+			}
+			
+			if ($scope.accessKey == null) {
+				$scope.getAccessKey();
+			}
+			
 		});
+		
 	};
 	
-	$scope.doDatabase = function() {
-		$http.get('http://localhost:9200/positions/_search?size=1000').success(function(data) {
-			$scope.data = data.hits.hits;
-		}).error(function(data){
-			alert(data);
-		});
+	$scope.onLocationFail = function(positionError) {
+		console.error(positionError);
 	};
 	
-	$scope.putFocusOnMap = function(lat, lon) {
+	$scope.initMap = function(lat, lon) {
+		var mapOptions = {
+				center: { lat: lat, lng: lon},
+				zoom: 16
+		};
+		$scope.map = new google.maps.Map(document.getElementById('map-canvas'),
+		            mapOptions);
+		$scope.userMarker = new google.maps.Marker(
+				{
+					position: new google.maps.LatLng(lat, lon), 
+					map: $scope.map, 
+					title: "Tu"
+				});
+	}
+	
+	$scope.putFocusOnMap = function(lat, lon, title) {
+		if ($scope.focusMarker == null) {
+			$scope.focusMarker = new google.maps.Marker(
+					{
+						position: new google.maps.LatLng(lat, lon), 
+						map: $scope.map, 
+						title: title,
+						animation: google.maps.Animation.DROP,
+						icon: "marker.png"
+					});
+		}
+		$scope.focusMarker.setPosition(new google.maps.LatLng(lat, lon));
 		$scope.map.panTo(new google.maps.LatLng(lat, lon));
 		$scope.map.setZoom(18);
 	}
+	
+	window.addEventListener('unload', function(e) {
+		var time = new Date();
+		time.setTime(time.getTime() + 30 * 60 * 1000);
+		document.cookie = 'key=' + $scope.accessKey + '; expires=' + time.toUTCString();
+	});
+	navigator.geolocation.watchPosition($scope.onLocationUpdate, $scope.onLocationFail);
 });

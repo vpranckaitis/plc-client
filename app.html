@@ -20,16 +20,8 @@
 	</head>
 
 	<body ng-controller="Controller">
-		<button ng-click="doGet()" ng-disabled="accessKey == null">Do GET</button>
-		<button ng-click="doPost()">Do POST</button>
-		<button ng-click="doPut()" ng-disabled="accessKey == null">Do PUT</button>
-		<button ng-click="doDelete()" ng-disabled="accessKey == null">Do DELETE</button>
-		<button ng-click="doDatabase()">Do Database</button>
-		<ul>
-			<li class="phone-listing" ng-repeat="(propertyName, value) in data">
-				{{propertyName}} : {{value}}
-			</li>
-		</ul>
+		<button ng-click="getPlaces()" ng-disabled="accessKey == null">{{(placesList == null ? 'Gauti' : 'Atnaujinti')}}</button>
+		<img id="loading" ng-if="loading == true" src="loading.png" />
 		<div id="type-selector">
 			<label ng-repeat="type in availableTypes"><input type="checkbox" name="{{type.value}}"  />{{type.name}}</label>
 		</div>
