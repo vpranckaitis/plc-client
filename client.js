@@ -84,7 +84,7 @@ plcApp.controller('Controller', function($scope, $http) {
 				$scope.lastUpdate = new Date().getTime();
 			}
 		}).catch(function(error) {
-			if (error.status == 401) {
+			if (error.status == 404) {
 				console.error('key is invalid');
 				$scope.getAccessKey();
 			}
